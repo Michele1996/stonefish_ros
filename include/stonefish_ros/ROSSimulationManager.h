@@ -47,6 +47,8 @@
 #include <stonefish_ros/SonarSettings.h>
 #include <stonefish_ros/SonarSettings2.h>
 #include <stonefish_ros/Respawn.h>
+#include <stonefish_ros/Respawn.h>
+#include <stonefish_ros/SimulationInfo.h>
 #include <image_transport/image_transport.h>
 #include "stonefish_ros/ROSControlInterface.h"
 
@@ -114,6 +116,7 @@ namespace sf
 	    image_transport::ImageTransport& getImageTransportHandle();
 	    std::map<std::string, ros::ServiceServer>& getServiceServers();
 		std::map<std::string, ros::Publisher>& getPublishers();
+		ros::Publisher simulation_info_publisher_;
 		std::map<std::string, image_transport::Publisher>& getImagePublishers();
 	    std::map<std::string, ros::Subscriber>& getSubscribers();
 		std::map<std::string, std::pair<sensor_msgs::ImagePtr, sensor_msgs::CameraInfoPtr>>& getCameraMsgPrototypes();

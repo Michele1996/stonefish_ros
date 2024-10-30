@@ -154,6 +154,7 @@ void ROSSimulationManager::BuildScenario()
     srvDCurrents = nh.advertiseService("disable_currents", &ROSSimulationManager::DisableCurrents, this);
     srvRespawn = nh.advertiseService("respawn_robot", &ROSSimulationManager::RespawnRobot, this);
     spinner.start();
+    simulation_info_publisher_ = nh.advertise<stonefish_ros::SimulationInfo>("simulation_info", 10);
 }
 
 void ROSSimulationManager::DestroyScenario()
@@ -516,6 +517,13 @@ void ROSSimulationManager::SimulationStepCompleted(Scalar timeStep)
             rosRobots[i]->respawnRequested = false;
         }
     }    
+
+    /////////////////////////////////// SIM INFO ///////////////////////////////////////
+    
+    float water_type = getOcean()->getWaterType();
+    stonefish_ros::SimulationInfo sim_info_message = stonefish_ros::SimulationInfo();
+    sim_info_message.water_type = water_type;
+    simulation_info_publisher_.publish(sim_info_message);
 
     /////////////////////////////////// DEBUG //////////////////////////////////////////
     auto hydroLambda = [](Robot* r)
