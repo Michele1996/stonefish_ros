@@ -37,6 +37,7 @@
 #include <Stonefish/sensors/scalar/RotaryEncoder.h>
 #include <Stonefish/sensors/scalar/Odometry.h>
 #include <Stonefish/sensors/scalar/Multibeam.h>
+#include <Stonefish/sensors/scalar/LaserMEMS.h>
 #include <Stonefish/sensors/scalar/Profiler.h>
 #include <Stonefish/sensors/vision/ColorCamera.h>
 #include <Stonefish/sensors/vision/DepthCamera.h>
@@ -46,6 +47,7 @@
 #include <Stonefish/sensors/vision/MSIS.h>
 #include <Stonefish/sensors/Contact.h>
 #include <Stonefish/comms/USBL.h>
+#include <Stonefish/comms/VLC.h>
 #include <Stonefish/entities/AnimatedEntity.h>
 #include <Stonefish/core/SimulationApp.h>
 #include <Stonefish/core/SimulationManager.h>
@@ -445,6 +447,60 @@ void ROSInterface::PublishMultibeamPCL(ros::Publisher& pub, Multibeam* mb)
     }
 }
 
+void ROSInterface::PublishLaserMEMSPCL(ros::Publisher& pub, LaserMEMS* mb)
+{
+    Sample sample = mb->getLastSample();
+    SensorChannel channel = mb->getSensorChannelDescription(0);
+    std::vector<Scalar> distances = sample.getData();
+    
+    pcl::PointCloud<pcl::PointXYZ>::Ptr msg(new pcl::PointCloud<pcl::PointXYZ>);
+    msg->header.frame_id = mb->getName();
+    msg->header.seq = sample.getId(); // In this message it does not increase automatically
+    msg->height = msg->width = 1;
+    // Set the number of lines and points per line
+    unsigned int numP = mb->getNumPoints(); // Number of lines
+    unsigned int numL = mb->getNumLines(); // Number of points per line
+
+    // Set horizontal FOV to 1 meter and vertical FOV to half a meter
+    Scalar sensorWidth = mb->getHorizontalFOV();
+    Scalar sensorHeight = mb->getVerticalFOV();
+    Scalar focalLength = sensorWidth / (2.0 * tan(sensorWidth)); // Calculate focal length
+    Scalar horizontalStep = sensorWidth / (numP - 1);
+    Scalar verticalStep = sensorHeight / (numL - 1);
+    //auto point_cloud_delay_microseconds = std::chrono::microseconds(10000);
+
+    // Shoot rays
+
+    for (unsigned int i = 0; i < numP; ++i){
+        for (unsigned int j = 0; j < numL; ++j){
+             // Calculate direction based on both horizontal and vertical angles
+             Scalar currentHorizontalAngle = -0.25 + i * horizontalStep;
+             Scalar currentVerticalAngle = -0.25 + j * verticalStep;
+             pcl::PointXYZ pt;
+             pt.y = btSin(currentHorizontalAngle) * btCos(currentVerticalAngle) * distances[j*numL+i];
+             pt.x = btCos(currentHorizontalAngle) * distances[j*numL+i];
+             pt.z = btSin(currentVerticalAngle)*distances[j*numL+i];
+             msg->push_back(pt);
+        }
+
+        pcl_conversions::toPCL(ros::Time(s.getTimestamp()), msg->header.stamp);
+        try
+        {
+           pub.publish(msg);
+        }
+        catch (ros::serialization::StreamOverrunException& soe)
+        {
+           ROS_ERROR_STREAM("Stream overrun exception while publishing multibeam data: " <<    soe.what());
+        }
+        catch (std::runtime_error& e)
+        {  
+           ROS_ERROR_STREAM("Runtime error whle publishing multibeam data: " << e.what());
+        }
+        
+        //std::this_thread::sleep_for(point_cloud_delay_microseconds);
+     }
+}
+
 void ROSInterface::PublishProfiler(ros::Publisher& pub, Profiler* prof)
 {
     const std::vector<Sample>* hist = prof->getHistory();
@@ -484,6 +540,68 @@ void ROSInterface::PublishProfiler(ros::Publisher& pub, Profiler* prof)
 
     pub.publish(msg);
 }
+
+void ROS2Interface::PublishVLC(rclcpp::PublisherBase::SharedPtr pub, rclcpp::PublisherBase::SharedPtr pubInfo, VLC* VLC) const
+{
+    CommDataFrame* data = VLC->getData();
+    std::vector<uint8_t> buffer; 
+    // Serialize data_mission field depending on its active type
+    std::visit([&buffer](auto&& arg) {
+        using T = std::decay_t<decltype(arg)>;
+
+        if constexpr (std::is_same_v<T, int>) {
+            buffer.push_back(1);  // Identifier for int
+            buffer.insert(buffer.end(), reinterpret_cast<uint8_t*>(&arg), reinterpret_cast<uint8_t*>(&arg) + sizeof(arg));
+        } 
+        else if constexpr (std::is_same_v<T, float>) {
+            buffer.push_back(2);  // Identifier for float
+            buffer.insert(buffer.end(), reinterpret_cast<uint8_t*>(&arg), reinterpret_cast<uint8_t*>(&arg) + sizeof(arg));
+        } 
+        else if constexpr (std::is_same_v<T, double>) {
+            buffer.push_back(3);  // Identifier for double
+            buffer.insert(buffer.end(), reinterpret_cast<uint8_t*>(&arg), reinterpret_cast<uint8_t*>(&arg) + sizeof(arg));
+        } 
+        else if constexpr (std::is_same_v<T, std::string>) {
+            buffer.push_back(4);  // Identifier for string
+            uint32_t str_len = arg.size();
+            buffer.insert(buffer.end(), reinterpret_cast<uint8_t*>(&str_len), reinterpret_cast<uint8_t*>(&str_len) + sizeof(str_len));
+            buffer.insert(buffer.end(), arg.begin(), arg.end());
+        } 
+        else if constexpr (std::is_same_v<T, std::vector<uint8_t>>) {
+            buffer.push_back(5);  // Identifier for uint8 array
+            uint32_t vec_len = arg.size();
+            buffer.insert(buffer.end(), reinterpret_cast<uint8_t*>(&vec_len), reinterpret_cast<uint8_t*>(&vec_len) + sizeof(vec_len));
+            buffer.insert(buffer.end(), arg.begin(), arg.end());
+        } 
+        else if constexpr (std::is_same_v<T, std::vector<float>>) {
+            buffer.push_back(6);  // Identifier for float array
+            uint32_t vec_len = arg.size();
+            buffer.insert(buffer.end(), reinterpret_cast<uint8_t*>(&vec_len), reinterpret_cast<uint8_t*>(&vec_len) + sizeof(vec_len));
+            for (float val : arg) {
+                buffer.insert(buffer.end(), reinterpret_cast<uint8_t*>(&val), reinterpret_cast<uint8_t*>(&val) + sizeof(val));
+            }
+        } 
+        else if constexpr (std::is_same_v<T, std::vector<double>>) {
+            buffer.push_back(7);  // Identifier for double array
+            uint32_t vec_len = arg.size();
+            buffer.insert(buffer.end(), reinterpret_cast<uint8_t*>(&vec_len), reinterpret_cast<uint8_t*>(&vec_len) + sizeof(vec_len));
+            for (double val : arg) {
+                buffer.insert(buffer.end(), reinterpret_cast<uint8_t*>(&val), reinterpret_cast<uint8_t*>(&val) + sizeof(val));
+            }
+        } 
+        else if constexpr (std::is_same_v<T, PointCloud>) {
+            buffer.push_back(8);  // Identifier for PointCloud
+            std::vector<uint8_t> pointcloud_data = serializePointCloud(arg);
+            buffer.insert(buffer.end(), pointcloud_data.begin(), pointcloud_data.end());
+        }
+    }, data->data_mission);
+    
+    std_msgs::msg::ByteMultiArray byte_msg;
+    byte_msg.data = buffer;
+   
+    std::static_pointer_cast<rclcpp::Publisher<std_msgs::msg::ByteMultiArray>>(pub)->publish(byte_msg);
+}
+
 
 void ROSInterface::PublishMultibeam2(ros::Publisher& pub, Multibeam2* mb)
 {

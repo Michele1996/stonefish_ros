@@ -45,6 +45,7 @@
 #include <Stonefish/sensors/scalar/Odometry.h>
 #include <Stonefish/sensors/vision/ColorCamera.h>
 #include <Stonefish/sensors/vision/DepthCamera.h>
+#include <Stonefish/sensors/scalar/LaserMEMS.h>
 #include <Stonefish/sensors/scalar/Multibeam.h>
 #include <Stonefish/sensors/vision/Multibeam2.h>
 #include <Stonefish/sensors/vision/FLS.h>
@@ -276,6 +277,12 @@ void ROSSimulationManager::SimulationStepCompleted(Scalar timeStep)
                     ROSInterface::PublishMultibeam(pubs.at(sensor->getName()), (Multibeam*)sensor);
                     if(pubs.find(sensor->getName() + "/pcl") != pubs.end())
                         ROSInterface::PublishMultibeamPCL(pubs.at(sensor->getName() + "/pcl"), (Multibeam*)sensor);
+                }
+                    break;
+                    
+               case ScalarSensorType::LASERMEMS:
+                {
+                   ROSInterface::PublishLaserMEMSPCL(pubs.at(sensor->getName() + "/pcl"), (LaserMEMS*)sensor);
                 }
                     break;
 
