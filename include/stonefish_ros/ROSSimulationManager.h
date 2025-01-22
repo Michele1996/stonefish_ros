@@ -75,6 +75,8 @@ namespace sf
 		std::map<std::string, std::pair<ServoControlMode, Scalar>> servoSetpoints;
 		bool respawnRequested;
 		Transform respawnOrigin;
+		
+		ros::Publisher batteryPublisher;
 
 		ROSRobot(Robot* robot, unsigned int nThrusters, unsigned int nPropellers, unsigned int nRudders=0)
 			: robot(robot), publishBaseLinkTransform(false), respawnRequested(false)

@@ -27,7 +27,7 @@
 #include "stonefish_ros/ROSScenarioParser.h"
 #include "stonefish_ros/ROSInterface.h"
 #include "stonefish_ros/ThrusterState.h"
-
+#include <Stonefish/core/Battery.h>
 #include <Stonefish/core/Robot.h>
 #include <Stonefish/entities/SolidEntity.h>
 #include <Stonefish/entities/AnimatedEntity.h>
@@ -191,6 +191,8 @@ void ROSSimulationManager::DestroyScenario()
 void ROSSimulationManager::AddROSRobot(ROSRobot* robot)
 {
     rosRobots.push_back(robot);
+    std::string batteryTopic = "/robot_" + robot->robot->getName() + "/battery_level";
+    robot->batteryPublisher = nh.advertise<std_msgs::Float64>(batteryTopic, 10);
 }
 
 bool ROSSimulationManager::RespawnROSRobot(const std::string& robotName, const Transform& origin)
@@ -350,11 +352,15 @@ void ROSSimulationManager::SimulationStepCompleted(Scalar timeStep)
         }
     }
 
-    //////////////////////////////////////WORLD TRANSFORMS/////////////////////////////////////////
+    //////////////////////////////////////WORLD TRANSFORMS AND BATTERY LEVEL/////////////////////////////////////////
     for(size_t i=0; i<rosRobots.size(); ++i)
     {
         if(rosRobots[i]->publishBaseLinkTransform)
             ROSInterface::PublishTF(br, rosRobots[i]->robot->getTransform(), ros::Time(getSimulationTime(true)), "world_ned", rosRobots[i]->robot->getName() + "/base_link");
+            
+        std_msgs::Float64 batteryMsg;
+        batteryMsg.data = rosRobot[i]->robot->getBattery()->getEnergyRemaining();
+        rosRobot[i]->batteryPublisher.publish(batteryMsg);
     }
 
     //////////////////////////////////////SERVOS(JOINTS)/////////////////////////////////////////
