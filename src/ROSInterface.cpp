@@ -449,7 +449,7 @@ void ROSInterface::PublishMultibeamPCL(ros::Publisher& pub, Multibeam* mb)
 
 void ROSInterface::PublishLaserMEMSPCL(ros::Publisher& pub, LaserMEMS* mb)
 {
-    Sample sample = mb->getLastSample();
+    /*Sample sample = mb->getLastSample();
     SensorChannel channel = mb->getSensorChannelDescription(0);
     std::vector<Scalar> distances = sample.getData();
     
@@ -499,6 +499,7 @@ void ROSInterface::PublishLaserMEMSPCL(ros::Publisher& pub, LaserMEMS* mb)
         
         //std::this_thread::sleep_for(point_cloud_delay_microseconds);
      }
+     */
 }
 
 void ROSInterface::PublishProfiler(ros::Publisher& pub, Profiler* prof)
@@ -541,9 +542,9 @@ void ROSInterface::PublishProfiler(ros::Publisher& pub, Profiler* prof)
     pub.publish(msg);
 }
 
-void ROS2Interface::PublishVLC(rclcpp::PublisherBase::SharedPtr pub, rclcpp::PublisherBase::SharedPtr pubInfo, VLC* VLC) const
+void ROSInterface::PublishVLC(ros::Publisher& pub, ros::Publisher& pubInfo, VLC* VLC)
 {
-    CommDataFrame* data = VLC->getData();
+    /*CommDataFrame* data = VLC->getData();
     std::vector<uint8_t> buffer; 
     // Serialize data_mission field depending on its active type
     std::visit([&buffer](auto&& arg) {
@@ -596,10 +597,7 @@ void ROS2Interface::PublishVLC(rclcpp::PublisherBase::SharedPtr pub, rclcpp::Pub
         }
     }, data->data_mission);
     
-    std_msgs::msg::ByteMultiArray byte_msg;
-    byte_msg.data = buffer;
-   
-    std::static_pointer_cast<rclcpp::Publisher<std_msgs::msg::ByteMultiArray>>(pub)->publish(byte_msg);
+   */
 }
 
 

@@ -359,8 +359,8 @@ void ROSSimulationManager::SimulationStepCompleted(Scalar timeStep)
             ROSInterface::PublishTF(br, rosRobots[i]->robot->getTransform(), ros::Time(getSimulationTime(true)), "world_ned", rosRobots[i]->robot->getName() + "/base_link");
             
         std_msgs::Float64 batteryMsg;
-        batteryMsg.data = rosRobot[i]->robot->getBattery()->getEnergyRemaining();
-        rosRobot[i]->batteryPublisher.publish(batteryMsg);
+        batteryMsg.data = rosRobots[i]->robot->getBattery()->getEnergyRemaining();
+        rosRobots[i]->batteryPublisher.publish(batteryMsg);
     }
 
     //////////////////////////////////////SERVOS(JOINTS)/////////////////////////////////////////
